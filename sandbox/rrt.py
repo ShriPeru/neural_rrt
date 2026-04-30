@@ -8,6 +8,7 @@ class Node:
     def __init__(self, x, y):
         self.x = x
         self.y = y
+        self.cost = 0
         self.parent = None
 
     def setx(self, x):
@@ -31,6 +32,33 @@ class RRT:
 
     def setMap(self, rows=100, cols=100):
         self.gridMap = np.zeros((rows, cols), dtype=np.int8)
+
+    def chooseParent(self, newNode):
+        cheapestParent = newNode.parent
+        mincost = newNode.cost
+        for node in self.tree:
+            dist = self.euclid_distance(node, newNode)
+            if dist >= self.step_size * 3:
+                continue
+            cost = node.cost + dist
+            if self.collisionCheck(node, newNode):
+                continue
+            if cost < mincost or mincost == -1:
+                cheapestParent = node
+                mincost = cost
+        newNode.parent = cheapestParent
+        newNode.cost = mincost
+
+    def rewire(self, newNode):
+        for i in range(0, len(self.tree)):
+            dist = self.euclid_distance(self.tree[i], newNode)
+            if dist >= self.step_size * 3:
+                continue
+            if (self.tree[i].cost > (newNode.cost + dist)) and not self.collisionCheck(
+                newNode, self.tree[i]
+            ):
+                self.tree[i].parent = newNode
+                self.tree[i].cost = newNode.cost + dist
 
     def euclid_distance(self, curNode, nextNode):
         return np.hypot(curNode.x - nextNode.x, curNode.y - nextNode.y)
@@ -76,7 +104,7 @@ class RRT:
 
     def goalCheck(self, newNode):
         dist = self.euclid_distance(newNode, self.goalNode)
-        if dist < self.step_size:
+        if dist < self.step_size + 1:
             return True
         else:
             return False
@@ -96,6 +124,7 @@ class RRT:
         new_pos = np.array([nodeA.x, nodeA.y]) + direction * self.step_size
         nodeC = Node(new_pos[0], new_pos[1])
         nodeC.parent = nodeA
+        nodeC.cost = nodeA.cost + self.euclid_distance(nodeA, nodeC)
         return nodeC
 
     def tracePath(self, node):
@@ -112,7 +141,9 @@ class RRT:
             nearNode = self.nearestNode(randompoint)
             nextNode = self.extend(nearNode, randompoint)
             if not self.collisionCheck(nearNode, nextNode):
+                self.chooseParent(nextNode)
                 self.tree.append(nextNode)
+                self.rewire(nextNode)
                 if self.goalCheck(nextNode):
                     return self.tracePath(nextNode)
         return None
@@ -121,15 +152,13 @@ class RRT:
 if __name__ == "__main__":
     grid = np.zeros((100, 100), dtype=np.int8)
 
-    # vertical wall near the middle with a gap
     grid[20:45, 40] = 1
     grid[55:80, 40] = 1
-    # horizontal wall blocking upper path
     grid[30, 50:75] = 1
 
     goal = Node(63, 31)
     start = Node(10, 10)
-    rrt = RRT(start, goal, grid, 1, 100000)
+    rrt = RRT(start, goal, grid, 3, 8000)
 
     path = rrt.plan()
     if path:
@@ -140,7 +169,8 @@ if __name__ == "__main__":
         print("No path found.")
     plt.figure(figsize=(8, 8))
     plt.imshow(grid, cmap="gray_r")
-
+    if path:
+        print(f"Total path cost is {path[-1].cost}")
     # draw tree
     for node in rrt.tree:
         if node.parent:
