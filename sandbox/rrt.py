@@ -5,10 +5,11 @@ import numpy as np
 
 
 class Node:
-    def __init__(self, x, y):
+    def __init__(self, x, y, theta=0.0):
         self.x = x
         self.y = y
         self.cost = 0
+        self.theta = theta
         self.parent = None
 
     def setx(self, x):
@@ -21,14 +22,162 @@ class Node:
         self.parent = parent
 
 
+class Dubins:
+    def __init__(self, nodeA, nodeB, r):
+        self.nodeA = nodeA
+        self.nodeB = nodeB
+        self.r = r
+
+    def LSL(self):
+        cs_x = self.nodeA.x - self.r * np.sin(self.nodeA.theta)
+        cs_y = self.nodeA.y + self.r * np.cos(self.nodeA.theta)
+        cg_x = self.nodeB.x - self.r * np.sin(self.nodeB.theta)
+        cg_y = self.nodeB.y + self.r * np.cos(self.nodeB.theta)
+
+        diff_x = cg_x - cs_x
+        diff_y = cg_y - cs_y
+        dist_centers = np.sqrt(diff_x**2 + diff_y**2)
+        phi = np.arctan2(diff_y, diff_x)
+
+        t = (phi - self.nodeA.theta) % (2 * np.pi)
+        p = dist_centers
+        q = (self.nodeB.theta - phi) % (2 * np.pi)
+        return t, p, q
+
+    def RSR(self):
+        cs_x = self.nodeA.x + self.r * np.sin(self.nodeA.theta)
+        cs_y = self.nodeA.y - self.r * np.cos(self.nodeA.theta)
+        cg_x = self.nodeB.x + self.r * np.sin(self.nodeB.theta)
+        cg_y = self.nodeB.y - self.r * np.cos(self.nodeB.theta)
+
+        diff_x = cg_x - cs_x
+        diff_y = cg_y - cs_y
+        dist_centers = np.sqrt(diff_x**2 + diff_y**2)
+        phi = np.arctan2(diff_y, diff_x)
+
+        t = (self.nodeA.theta - phi) % (2 * np.pi)
+        p = dist_centers
+        q = (phi - self.nodeB.theta) % (2 * np.pi)
+        return t, p, q
+
+    def LSR(self):
+        cs_x = self.nodeA.x - self.r * np.sin(self.nodeA.theta)
+        cs_y = self.nodeA.y + self.r * np.cos(self.nodeA.theta)
+        cg_x = self.nodeB.x + self.r * np.sin(self.nodeB.theta)
+        cg_y = self.nodeB.y - self.r * np.cos(self.nodeB.theta)
+
+        diff_x = cg_x - cs_x
+        diff_y = cg_y - cs_y
+        dist_centers = np.sqrt(diff_x**2 + diff_y**2)
+        phi = np.arctan2(diff_y, diff_x)
+
+        val = dist_centers**2 - (2 * self.r) ** 2
+        if val < 0:
+            return None
+        p = np.sqrt(val)
+
+        phi2 = phi - np.arctan2(2 * self.r, p)
+        t = (phi2 - self.nodeA.theta) % (2 * np.pi)
+        q = (phi2 - self.nodeB.theta) % (2 * np.pi)
+        return t, p, q
+
+    def RSL(self):
+        cs_x = self.nodeA.x + self.r * np.sin(self.nodeA.theta)
+        cs_y = self.nodeA.y - self.r * np.cos(self.nodeA.theta)
+        cg_x = self.nodeB.x - self.r * np.sin(self.nodeB.theta)
+        cg_y = self.nodeB.y + self.r * np.cos(self.nodeB.theta)
+
+        diff_x = cg_x - cs_x
+        diff_y = cg_y - cs_y
+        dist_centers = np.sqrt(diff_x**2 + diff_y**2)
+        phi = np.arctan2(diff_y, diff_x)
+
+        val = dist_centers**2 - (2 * self.r) ** 2
+        if val < 0:
+            return None
+        p = np.sqrt(val)
+
+        phi2 = phi + np.arctan2(2 * self.r, p)
+        t = (self.nodeA.theta - phi2) % (2 * np.pi)
+        q = (self.nodeB.theta - phi2) % (2 * np.pi)
+        return t, p, q
+
+    def LRL(self):
+        cs_x = self.nodeA.x - self.r * np.sin(self.nodeA.theta)
+        cs_y = self.nodeA.y + self.r * np.cos(self.nodeA.theta)
+        cg_x = self.nodeB.x - self.r * np.sin(self.nodeB.theta)
+        cg_y = self.nodeB.y + self.r * np.cos(self.nodeB.theta)
+
+        diff_x = cg_x - cs_x
+        diff_y = cg_y - cs_y
+        dist_centers = np.sqrt(diff_x**2 + diff_y**2)
+        phi = np.arctan2(diff_y, diff_x)
+
+        val = (4 * self.r**2 - dist_centers**2) / (4 * self.r**2)
+        if val < -1 or val > 1:
+            return None
+        angle = np.arccos(val)
+
+        t = (phi - self.nodeA.theta + angle) % (2 * np.pi)
+        p = 2 * angle
+        q = (self.nodeB.theta - phi + angle) % (2 * np.pi)
+        return t, p, q
+
+    def RLR(self):
+        cs_x = self.nodeA.x + self.r * np.sin(self.nodeA.theta)
+        cs_y = self.nodeA.y - self.r * np.cos(self.nodeA.theta)
+        cg_x = self.nodeB.x + self.r * np.sin(self.nodeB.theta)
+        cg_y = self.nodeB.y - self.r * np.cos(self.nodeB.theta)
+
+        diff_x = cg_x - cs_x
+        diff_y = cg_y - cs_y
+        dist_centers = np.sqrt(diff_x**2 + diff_y**2)
+        phi = np.arctan2(diff_y, diff_x)
+
+        val = (4 * self.r**2 - dist_centers**2) / (4 * self.r**2)
+        if val < -1 or val > 1:
+            return None
+        angle = np.arccos(val)
+
+        t = (self.nodeA.theta - phi + angle) % (2 * np.pi)
+        p = 2 * angle
+        q = (phi - self.nodeB.theta + angle) % (2 * np.pi)
+        return t, p, q
+
+    def shortest_path(self):
+        results = []
+        for fn in [self.LSL, self.RSR, self.LSR, self.RSL, self.LRL, self.RLR]:
+            try:
+                result = fn()
+                if result is None:
+                    continue
+                t, p, q = result
+
+                if fn.__name__ in ("LRL", "RLR"):
+                    length = self.r * (t + p + q)
+                else:
+                    length = self.r * t + p + self.r * q
+                if length >= 0:
+                    results.append((length, t, p, q, fn.__name__))
+            except Exception:
+                continue
+        if not results:
+            return None
+        return min(results, key=lambda x: x[0])
+
+
 class RRT:
-    def __init__(self, startNode, goalNode, gridMap, step_size, max_iter):
+    def __init__(self, startNode, goalNode, gridMap, step_size, max_iter, radius):
         self.startNode = startNode
         self.goalNode = goalNode
         self.gridMap = gridMap
         self.step_size = step_size
         self.max_iter = max_iter
+        self.radius = radius
         self.tree = [self.startNode]
+        dx = self.goalNode.x - self.startNode.x
+        dy = self.goalNode.y - self.goalNode.y
+        self.startNode.theta = np.arctan2(dy, dx)
 
     def setMap(self, rows=100, cols=100):
         self.gridMap = np.zeros((rows, cols), dtype=np.int8)
@@ -112,6 +261,80 @@ class RRT:
     def euclid_point(self, nodeA, randomPoint):
         return np.hypot(nodeA.x - randomPoint[0], nodeA.y - randomPoint[1])
 
+    def dubin_extension(self, nodeA, randomPoint):
+        theta = np.arctan2(randomPoint[1] - nodeA.y, randomPoint[0] - nodeA.x)
+        randomNode = Node(randomPoint[0], randomPoint[1], theta)
+        dubin_path = Dubins(nodeA, randomNode, self.radius)
+        length, t, p, q, path_type = dubin_path.shortest_path()
+        nodeC = self.sample_dubins(length, t, p, q, path_type, nodeA, randomNode)
+        nodeC.parent = nodeA
+        nodeC.cost = nodeA.cost + length
+        return nodeC
+
+    def sample_dubins(self, length, t, p, q, path_type, nodeA, randomNode):
+        dist = self.step_size
+        seg1, seg2, seg3 = 0
+        seg1 = self.radius * t
+        seg2 = self.radius * p
+        x0 = nodeA.x
+        y0 = nodeA.y
+        theta0 = nodeA.theta
+        if path_type[1] == "S":
+            seg2 = p
+        seg3 = self.radius * q
+
+        seg1 = min(dist, seg1)
+        arc_angle = seg1 / self.radius
+        x1, y1, theta1 = self.turn(x0, y0, theta0, arc_angle, path_type[0], self.radius)
+        dist = dist - seg1
+        if not dist == 0:
+            if path_type[1] == "S":
+                seg2 = min(seg2, dist)
+                dist = dist - seg2
+                x2 = x1 + seg2 * np.cos(theta1)
+                y2 = y1 + seg2 * np.sin(theta1)
+                theta2 = theta1
+            else:
+                seg2 = min(seg2, dist)
+                arc_angle = seg2 / self.radius
+                dist = dist - seg2
+                x2, y2, theta2 = self.turn(
+                    x1, y1, theta1, arc_angle, path_type[1], self.radius
+                )
+
+            if not dist == 0:
+                seg3 = min(seg3, dist)
+                arc_angle = seg3 / self.radius
+                dist = dist - seg3
+                x3, y3, theta3 = self.turn(
+                    x2, y2, theta2, arc_angle, path_type[2], self.radius
+                )
+                nodeC = Node(x3, y3, theta3)
+            else:
+                nodeC = Node(x2, y2, theta2)
+        else:
+            nodeC = Node(x1, y1, theta1)
+
+        return nodeC
+
+    def turn(self, x, y, theta, angle, direction, r):
+        cx = 0
+        cy = 0
+        theta_new = 0
+        if direction == "L":
+            cx = x - r * np.sin(theta)
+            cy = y + r * np.cos(theta)
+            theta_new = theta + angle
+        if direction == "R":
+            cx = x + r * np.sin(theta)
+            cy = y - r * np.cos(theta)
+            theta_new = theta - angle
+
+        x_new = cx + r * np.sin(theta_new)
+        y_new = cy - r * np.cos(theta_new)
+
+        return x_new, y_new, theta_new
+
     def extend(self, nodeA, randomPoint):
 
         diff = np.array(
@@ -158,7 +381,7 @@ if __name__ == "__main__":
 
     goal = Node(63, 31)
     start = Node(10, 10)
-    rrt = RRT(start, goal, grid, 3, 8000)
+    rrt = RRT(start, goal, grid, 3, 8000, 4)
 
     path = rrt.plan()
     if path:
